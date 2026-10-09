@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital DocVerify AI - Hackathon Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            },
+            accent: {
+              500: '#6366f1',
+              600: '#4f46e5',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    
+    .bounding-box {
+      position: absolute;
+      border: 2px dashed #22c55e;
+      background-color: rgba(34, 197, 94, 0.15);
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .bounding-box:hover, .bounding-box.active {
+      border-color: #6366f1;
+      background-color: rgba(99, 102, 241, 0.25);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.5);
+    }
+    .tamper-box {
+      position: absolute;
+      border: 2px dashed #ef4444;
+      background-color: rgba(239, 68, 68, 0.2);
+      animation: pulse-red 1.5s infinite;
+    }
+    @keyframes pulse-red {
+      0%, 100% { opacity: 0.9; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      50% { opacity: 0.5; box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+    .scanner-line {
+      position: absolute;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #22c55e, transparent);
+      box-shadow: 0 0 15px #22c55e;
+      animation: scan 2s linear infinite;
+    }
+    @keyframes scan {
+      0% { top: 0%; opacity: 0.8; }
+      50% { opacity: 1; }
+      100% { top: 100%; opacity: 0.8; }
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans bg-slate-950 text-slate-100 antialiased selection:bg-brand-500 selection:text-slate-950">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40 px-4 lg:px-8 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-accent-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
+        <i class="fa-solid fa-shield-halved text-xl text-white"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-lg tracking-tight text-white">Digital DocVerify AI</h1>
+          <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/20">v2.4 Neural AI</span>
+        </div>
+        <p class="text-xs text-slate-400">Autonomous ID Fraud & Optical Verification System</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <div class="hidden sm:flex items-center gap-2 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50 text-xs text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span>Engine Active: <strong class="text-white">Aadhaar / PAN / Passport OCR Core</strong></span>
+      </div>
+      <button id="logsToggleBtn" onclick="toggleModal('logsModal')" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-200 transition flex items-center gap-2">
+        <i class="fa-solid fa-terminal text-brand-500"></i>
+        <span>AI Inspection Log</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-y-auto">
+
+    <!-- TOP PRESET BAR / DEMO SELECTOR -->
+    <div class="lg:col-span-12 bg-slate-900/60 border border-slate-800 rounded-xl p-4 backdrop-blur">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <i class="fa-solid fa-vial-circle-check text-accent-500"></i> Fast Demo Presets
+          </h2>
+          <p class="text-xs text-slate-400">Select pre-configured test scenarios to evaluate verification workflows.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="loadSample('aadhaar_valid')" id="btn-aadhaar_valid" class="sample-btn px-3 py-1.5 text-xs font-medium rounded-lg border bg-brand-500/10 border-brand-500/40 text-brand-500 hover:bg-brand-500/20 transition flex items-center gap-2">
+            <i class="fa-solid fa-id-card"></i> Valid Aadhaar Card
+          </button>
+          <button onclick="loadSample('pan_expired')" id="btn-pan_expired" class="sample-btn px-3 py-1.5 text-xs font-medium rounded-lg border bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 transition flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> Expired PAN Card
+          </button>
+          <button onclick="loadSample('license_tampered')" id="btn-license_tampered" class="sample-btn px-3 py-1.5 text-xs font-medium rounded-lg border bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 transition flex items-center gap-2">
+            <i class="fa-solid fa-user-ninja text-rose-500"></i> Tampered License
+          </button>
+          <button onclick="loadSample('passport_valid')" id="btn-passport_valid" class="sample-btn px-3 py-1.5 text-xs font-medium rounded-lg border bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 transition flex items-center gap-2">
+            <i class="fa-solid fa-passport"></i> Valid Passport
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEFT PANEL: Document Upload & Visual Viewer (7 Cols) -->
+    <div class="lg:col-span-7 flex flex-col gap-6">
+
+      <!-- Upload Dropzone -->
+      <div id="dropzone" class="border-2 border-dashed border-slate-800 hover:border-brand-500/50 bg-slate-900/40 hover:bg-slate-900/70 rounded-2xl p-6 text-center cursor-pointer transition relative group">
+        <input type="file" id="fileInput" class="hidden" accept="image/*,.pdf" onchange="handleFileSelect(event)">
+        <div class="flex flex-col items-center justify-center gap-3">
+          <div class="w-14 h-14 rounded-full bg-slate-800 group-hover:bg-brand-500/10 group-hover:text-brand-500 text-slate-400 flex items-center justify-center text-2xl transition">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-slate-200">Drag & Drop Document Image / PDF</p>
+            <p class="text-xs text-slate-400 mt-1">Supports PNG, JPG, WEBP, or PDF up to 10MB</p>
+          </div>
+          <button onclick="document.getElementById('fileInput').click()" class="px-4 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition">
+            Browse Files
+          </button>
+        </div>
+      </div>
+
+      <!-- Document Image Viewer Canvas with Bounding Boxes -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col flex-1 relative overflow-hidden">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-eye text-brand-500"></i>
+            <span class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Visual AI Overlay</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-brand-500"></span> Extracted</span>
+            <span class="inline-flex items-center gap-1 ml-2"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Anomaly</span>
+          </div>
+        </div>
+
+        <!-- Document Container -->
+        <div id="docViewerContainer" class="relative flex-1 bg-slate-950 rounded-xl overflow-hidden border border-slate-800/80 flex items-center justify-center min-h-[320px] max-h-[420px] select-none">
+          <!-- Scanning Effect overlay -->
+          <div id="scannerLine" class="scanner-line hidden"></div>
+          
+          <!-- Image Element -->
+          <img id="docImage" src="" alt="Document Preview" class="max-h-full max-w-full object-contain transition-all">
+
+          <!-- Dynamic Bounding Boxes inserted via JS -->
+          <div id="boundingBoxOverlay" class="absolute inset-0 pointer-events-auto"></div>
+        </div>
+
+        <!-- Field Highlight Hint -->
+        <p class="text-xs text-slate-400 mt-2 text-center italic">
+          <i class="fa-solid fa-circle-info mr-1 text-accent-500"></i> Click any highlighted area on the document to focus corresponding extracted field.
+        </p>
+      </div>
+
+      <!-- Animated Pipeline Steps -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+        <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Verification Pipeline Status</h3>
+        <div class="grid grid-cols-4 gap-2">
+          
+          <div id="step1" class="flex flex-col items-center p-2 rounded-lg bg-slate-950 border border-slate-800 text-center transition">
+            <div class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs mb-1 step-icon">
+              <i class="fa-solid fa-file-shield"></i>
+            </div>
+            <span class="text-[11px] font-medium text-slate-300">Format Check</span>
+            <span class="text-[10px] text-slate-500 step-status">Pending</span>
+          </div>
+
+          <div id="step2" class="flex flex-col items-center p-2 rounded-lg bg-slate-950 border border-slate-800 text-center transition">
+            <div class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs mb-1 step-icon">
+              <i class="fa-solid fa-font"></i>
+            </div>
+            <span class="text-[11px] font-medium text-slate-300">OCR Extract</span>
+            <span class="text-[10px] text-slate-500 step-status">Pending</span>
+          </div>
+
+          <div id="step3" class="flex flex-col items-center p-2 rounded-lg bg-slate-950 border border-slate-800 text-center transition">
+            <div class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs mb-1 step-icon">
+              <i class="fa-solid fa-fingerprint"></i>
+            </div>
+            <span class="text-[11px] font-medium text-slate-300">Anti-Tamper</span>
+            <span class="text-[10px] text-slate-500 step-status">Pending</span>
+          </div>
+
+          <div id="step4" class="flex flex-col items-center p-2 rounded-lg bg-slate-950 border border-slate-800 text-center transition">
+            <div class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs mb-1 step-icon">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <span class="text-[11px] font-medium text-slate-300">Final Audit</span>
+            <span class="text-[10px] text-slate-500 step-status">Pending</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL: Extracted Data & Fraud Analytics (5 Cols) -->
+    <div class="lg:col-span-5 flex flex-col gap-6">
+
+      <!-- Overall Result & Confidence Gauge -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 relative overflow-hidden">
+        <div class="flex items-start justify-between">
+          <div>
+            <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Overall Verdict</span>
+            <div class="flex items-center gap-3 mt-1">
+              <h2 id="verdictBadge" class="text-2xl font-bold text-emerald-400 flex items-center gap-2">
+                <i class="fa-solid fa-circle-check"></i> VERIFIED
+              </h2>
+            </div>
+            <p id="verdictSubtext" class="text-xs text-slate-400 mt-1">High integrity. Ready for automated KYC intake.</p>
+          </div>
+
+          <!-- Score Gauge / Circle -->
+          <div class="flex flex-col items-center">
+            <div class="relative w-20 h-20 flex items-center justify-center">
+              <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path id="confidenceGauge" class="text-brand-500 transition-all duration-1000 ease-out" stroke-dasharray="98, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              </svg>
+              <div class="absolute text-center">
+                <span id="confidenceScoreText" class="text-lg font-bold text-white">98%</span>
+              </div>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono mt-1">AI Score</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fraud & Integrity Checks breakdown -->
+      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
+        <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+          <span>Authenticity & Fraud Checks</span>
+          <i class="fa-solid fa-shield-virus text-brand-500"></i>
+        </h3>
+        <div id="authenticityFlags" class="space-y-2">
+          <!-- Dynamic items -->
+        </div>
+      </div>
+
+      <!-- Extracted Key-Value Fields Card -->
+      <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex-1 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+            <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-database text-accent-500"></i> Structured OCR Data
+            </h3>
+            <span id="docTypeTag" class="px-2.5 py-0.5 text-[11px] font-mono rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+              AADHAAR_CARD
+            </span>
+          </div>
+
+          <!-- Extracted Data Fields Grid -->
+          <div id="extractedFieldsGrid" class="space-y-3 font-mono text-xs">
+            <!-- Dynamic Key Values inserted via JS -->
+          </div>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="pt-6 border-t border-slate-800 mt-6 grid grid-cols-2 gap-3">
+          <button onclick="handleApprove()" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-xl shadow-lg shadow-brand-600/20 text-xs transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-check"></i> Approve
+          </button>
+          <button onclick="handleReject()" class="px-4 py-2.5 bg-slate-800 hover:bg-rose-600/20 hover:border-rose-500/40 border border-slate-700 text-slate-200 font-semibold rounded-xl text-xs transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-xmark"></i> Reject
+          </button>
+          <button onclick="downloadAuditReport()" class="col-span-2 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-xl text-xs font-medium transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-file-arrow-down text-brand-500"></i> Export JSON Audit Report
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- TECHNICAL INSPECTION MODAL -->
+  <div id="logsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+        <div class="flex items-center gap-2 text-sm font-semibold text-slate-200">
+          <i class="fa-solid fa-terminal text-brand-500"></i> AI Detection & Neural Inspection Log
+        </div>
+        <button onclick="toggleModal('logsModal')" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      
+      <div class="p-4 font-mono text-xs overflow-y-auto bg-slate-950/90 text-slate-300 space-y-2 flex-1" id="modalLogContent">
+        <!-- Log lines inserted dynamically -->
+      </div>
+
+      <div class="p-3 border-t border-slate-800 bg-slate-900 text-right">
+        <button onclick="toggleModal('logsModal')" class="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg">
+          Close Technical Modal
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Mock Scenarios Dataset
+    const sampleDatasets = {
+      aadhaar_valid: {
+        id: "aadhaar_valid",
+        docType: "AADHAAR_CARD",
+        verdict: "APPROVED",
+        confidence: 98,
+        verdictText: "VERIFIED",
+        subtext: "High integrity. Format and holographic pattern valid.",
+        imageSrc: "https://placehold.co/600x380/0f172a/22c55e?text=GOVERNMENT+OF+INDIA%0A%0AAadhaar+Card+Sample%0AName:+Rajesh+Kumar%0AUID:+9876+5432+1098",
+        fields: {
+          full_name: { label: "Full Name", value: "Rajesh Kumar", box: { top: "35%", left: "10%", width: "50%", height: "12%" } },
+          uid_number: { label: "Aadhaar UID", value: "9876 5432 1098", box: { top: "60%", left: "10%", width: "65%", height: "15%" } },
+          dob: { label: "Date of Birth", value: "14/08/1992", box: { top: "48%", left: "10%", width: "35%", height: "10%" } },
+          gender: { label: "Gender", value: "Male", box: { top: "48%", left: "50%", width: "20%", height: "10%" } }
+        },
+        flags: [
+          { name: "Font & Typeface Consistency", pass: true, desc: "Standard Government fonts verified" },
+          { name: "Digital Signature Check", pass: true, desc: "QR Cryptographic signature match" },
+          { name: "Layout Geometry", pass: true, desc: "Exact alignment with UIDAI template" },
+          { name: "Photo Tampering / Copy Paste", pass: true, desc: "No spliced pixel boundaries detected" }
+        ],
+        logs: [
+          "[INIT] Loading image buffer into CNN model...",
+          "[OCR] Applied adaptive thresholding & deskew.",
+          "[OCR] Extracted UID: 9876 5432 1098 (Verhoeff Algorithm Check: PASSED)",
+          "[TAMPER] Analyzing Error Level Analysis (ELA)... Peak noise within safe bounds.",
+          "[FACIAL] Face bounding box matched photo region.",
+          "[AUDIT] Overall Trust Metric calculated: 0.982"
+        ]
+      },
+      pan_expired: {
+        id: "pan_expired",
+        docType: "PAN_CARD",
+        verdict: "FLAGGED",
+        confidence: 64,
+        verdictText: "EXPIRED / FLAGGED",
+        subtext: "Document format valid, but linked tax ID status is inactive or expired.",
+        imageSrc: "https://placehold.co/600x380/1e1b4b/eab308?text=INCOME+TAX+DEPARTMENT%0A%0AFLASH+PAN+CARD%0APicker:+PRIYA+SHARMA%0APAN:+ABCDE1234F",
+        fields: {
+          full_name: { label: "Name", value: "PRIYA SHARMA", box: { top: "32%", left: "10%", width: "55%", height: "12%" } },
+          pan_number: { label: "PAN Number", value: "ABCDE1234F", box: { top: "55%", left: "10%", width: "45%", height: "14%" } },
+          dob: { label: "Date of Birth", value: "03/11/1985", box: { top: "72%", left: "10%", width: "30%", height: "10%" } },
+          status: { label: "Tax ID Status", value: "INACTIVE (Expired)", box: { top: "72%", left: "50%", width: "40%", height: "10%" } }
+        },
+        flags: [
+          { name: "Pattern Structure Check", pass: true, desc: "PAN regex matches standard [A-Z]{5}[0-9]{4}[A-Z]{1}" },
+          { name: "Central Tax Database Lookup", pass: false, desc: "Flagged: Card status marked inactive" },
+          { name: "Hologram Reflection Test", pass: true, desc: "Specular highlights present" },
+          { name: "Expiry & Validity Window", pass: false, desc: "Re-verification required by tax authority" }
+        ],
+        logs: [
+          "[INIT] Processing Income Tax Department Document...",
+          "[OCR] Text Extraction Successful. Identifier: ABCDE1234F",
+          "[DB] Querying NSDL Mock Registry...",
+          "[WARN] Registry returned flag: INACTIVE_RECORD",
+          "[TAMPER] Visual ELA Check: Passed. Physical card authentic, but status invalid."
+        ]
+      },
+      license_tampered: {
+        id: "license_tampered",
+        docType: "DRIVING_LICENSE",
+        verdict: "TAMPERED",
+        confidence: 28,
+        verdictText: "TAMPER DETECTED",
+        subtext: "Spliced text pixels and mismatched fonts detected around Name & DOB.",
+        imageSrc: "https://placehold.co/600x380/450a0a/ef4444?text=DRIVING+LICENSE%0A%0A[MODIFIED]+ALEX+SMITH%0ALicense:+DL-042020110099",
+        fields: {
+          full_name: { label: "Name", value: "ALEX SMITH [SPLICED]", box: { top: "30%", left: "12%", width: "55%", height: "15%" }, tampered: true },
+          dl_number: { label: "License No.", value: "DL-042020110099", box: { top: "52%", left: "12%", width: "60%", height: "12%" } },
+          dob: { label: "Date of Birth", value: "01/01/2000 [ALTERED]", box: { top: "70%", left: "12%", width: "40%", height: "12%" }, tampered: true }
+        },
+        flags: [
+          { name: "Pixel Tamper / Copy-Paste Analysis", pass: false, desc: "High compression artifact variance in Name bounding box" },
+          { name: "Font Style Matching", pass: false, desc: "Secondary font detected on DOB region" },
+          { name: "RTO Database Cross-check", pass: false, desc: "Name in DB (Alexander Smith) differs from card OCR" },
+          { name: "Edge Continuity Check", pass: true, desc: "Card outer borders intact" }
+        ],
+        logs: [
+          "[INIT] Running Neural Fraud Detector v2.4...",
+          "[TAMPER_ALERT] High frequency noise anomaly at coords (x:72, y:114)",
+          "[TAMPER_ALERT] Font classification mismatch: Expected 'Roboto-Bold', detected 'Arial-MT'",
+          "[DB] RTO API match failed (Confidence < 0.30)",
+          "[VERDICT] Document marked unsafe. Reject recommended."
+        ]
+      },
+      passport_valid: {
+        id: "passport_valid",
+        docType: "PASSPORT",
+        verdict: "APPROVED",
+        confidence: 96,
+        verdictText: "VERIFIED",
+        subtext: "MRZ Zone checksum matches, passport number valid.",
+        imageSrc: "https://placehold.co/600x380/064e3b/10b981?text=REPUBLIC+OF+INDIA+PASSPORT%0A%0AP%3CINDSHARMA%3C%3EARAV%3C%3C%3C%3C%3C%3C%3C%3C%3C%3C%3C%3C%3C%3C%3C%3C%0AZ1234567%3C4IND9001011M2812318%3C%3C%3C%3C%3C%3C04",
+        fields: {
+          full_name: { label: "SurName/Given Name", value: "SHARMA, ARAV", box: { top: "25%", left: "10%", width: "60%", height: "12%" } },
+          passport_no: { label: "Passport No.", value: "Z1234567", box: { top: "42%", left: "10%", width: "35%", height: "12%" } },
+          nationality: { label: "Nationality", value: "INDIAN", box: { top: "42%", left: "50%", width: "30%", height: "12%" } },
+          mrz_line: { label: "MRZ Zone", value: "P<INDSHARMA<<ARAV<<<...", box: { top: "70%", left: "5%", width: "90%", height: "20%" } }
+        },
+        flags: [
+          { name: "ICAO Doc 9303 MRZ Checksum", pass: true, desc: "Checksum digit verification PASSED" },
+          { name: "IR / Specular Hologram", pass: true, desc: "Official seal pattern matched" },
+          { name: "Expiry Date Validation", pass: true, desc: "Valid through 2028" },
+          { name: "Face Photo Verification", pass: true, desc: "ICAO compliant photo format" }
+        ],
+        logs: [
+          "[INIT] Passport Scan Mode engaged...",
+          "[MRZ] Decoding Machine Readable Zone lines 1 & 2...",
+          "[MRZ] Line 1: P<INDSHARMA<<ARAV...",
+          "[MRZ] Line 2: Z1234567<4IND9001011M2812318...",
+          "[CHECKSUM] Modulo 10 Checksum calculation successful.",
+          "[VERDICT] High confidence passport match."
+        ]
+      }
+    };
+
+    let currentSample = sampleDatasets['aadhaar_valid'];
+
+    // Load Selected Sample Scenario
+    function loadSample(key) {
+      currentSample = sampleDatasets[key];
+      
+      // Update Active Buttons UI
+      document.querySelectorAll('.sample-btn').forEach(btn => {
+        btn.className = "sample-btn px-3 py-1.5 text-xs font-medium rounded-lg border bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 transition flex items-center gap-2";
+      });
+      const activeBtn = document.getElementById(`btn-${key}`);
+      if(activeBtn) {
+        activeBtn.className = "sample-btn px-3 py-1.5 text-xs font-medium rounded-lg border bg-brand-500/10 border-brand-500/40 text-brand-500 hover:bg-brand-500/20 transition flex items-center gap-2";
+      }
+
+      runPipelineAnimation();
+    }
+
+    // Pipeline Animation Step simulation
+    function runPipelineAnimation() {
+      const scanner = document.getElementById('scannerLine');
+      scanner.classList.remove('hidden');
+
+      // Reset Step UI
+      for(let i=1; i<=4; i++) {
+        const step = document.getElementById(`step${i}`);
+        step.className = "flex flex-col items-center p-2 rounded-lg bg-slate-950 border border-slate-800 text-center transition opacity-50";
+        step.querySelector('.step-status').innerText = "Running...";
+        step.querySelector('.step-status').className = "text-[10px] text-amber-500 step-status";
+      }
+
+      setTimeout(() => setStepDone(1), 300);
+      setTimeout(() => setStepDone(2), 700);
+      setTimeout(() => setStepDone(3), 1100);
+      setTimeout(() => {
+        setStepDone(4);
+        scanner.classList.add('hidden');
+        renderDocumentDetails();
+      }, 1400);
+    }
+
+    function setStepDone(stepNum) {
+      const step = document.getElementById(`step${stepNum}`);
+      step.className = "flex flex-col items-center p-2 rounded-lg bg-brand-500/10 border border-brand-500/30 text-center transition opacity-100";
+      step.querySelector('.step-status').innerText = "Complete";
+      step.querySelector('.step-status').className = "text-[10px] text-brand-500 step-status font-medium";
+    }
+
+    // Render Data into UI
+    function renderDocumentDetails() {
+      const doc = currentSample;
+
+      // Update Image Preview
+      document.getElementById('docImage').src = doc.imageSrc;
+
+      // Render Bounding Boxes
+      const boxOverlay = document.getElementById('boundingBoxOverlay');
+      boxOverlay.innerHTML = '';
+      
+      Object.keys(doc.fields).forEach(fieldKey => {
+        const f = doc.fields[fieldKey];
+        const box = document.createElement('div');
+        box.className = f.tampered ? 'tamper-box' : 'bounding-box';
+        box.style.top = f.box.top;
+        box.style.left = f.box.left;
+        box.style.width = f.box.width;
+        box.style.height = f.box.height;
+        box.title = `${f.label}: ${f.value}`;
+        
+        box.onclick = () => highlightField(fieldKey);
+        boxOverlay.appendChild(box);
+      });
+
+      // Update Verdict Badge & Confidence
+      const badge = document.getElementById('verdictBadge');
+      const subtext = document.getElementById('verdictSubtext');
+      const gauge = document.getElementById('confidenceGauge');
+      const scoreText = document.getElementById('confidenceScoreText');
+
+      scoreText.innerText = `${doc.confidence}%`;
+      gauge.setAttribute('stroke-dasharray', `${doc.confidence}, 100`);
+
+      if (doc.verdict === 'APPROVED') {
+        badge.className = "text-2xl font-bold text-emerald-400 flex items-center gap-2";
+        badge.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${doc.verdictText}`;
+        gauge.className.baseVal = "text-brand-500 transition-all duration-1000 ease-out";
+      } else if (doc.verdict === 'FLAGGED') {
+        badge.className = "text-2xl font-bold text-amber-400 flex items-center gap-2";
+        badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${doc.verdictText}`;
+        gauge.className.baseVal = "text-amber-500 transition-all duration-1000 ease-out";
+      } else {
+        badge.className = "text-2xl font-bold text-rose-500 flex items-center gap-2";
+        badge.innerHTML = `<i class="fa-solid fa-shield-xmark"></i> ${doc.verdictText}`;
+        gauge.className.baseVal = "text-rose-500 transition-all duration-1000 ease-out";
+      }
+      subtext.innerText = doc.subtext;
+
+      // Render Document Tag
+      document.getElementById('docTypeTag').innerText = doc.docType;
+
+      // Render Extracted Fields
+      const fieldsGrid = document.getElementById('extractedFieldsGrid');
+      fieldsGrid.innerHTML = '';
+
+      Object.keys(doc.fields).forEach(key => {
+        const f = doc.fields[key];
+        const row = document.createElement('div');
+        row.id = `field-row-${key}`;
+        row.className = `p-2.5 rounded-lg border transition ${f.tampered ? 'bg-rose-950/40 border-rose-500/40 text-rose-300' : 'bg-slate-950 border-slate-800 text-slate-300'} hover:border-accent-500/60 cursor-pointer flex justify-between items-center`;
+        row.onclick = () => highlightBox(key);
+        row.innerHTML = `
+          <div>
+            <span class="text-[10px] uppercase tracking-wider text-slate-400 block">${f.label}</span>
+            <span class="font-semibold text-slate-100">${f.value}</span>
+          </div>
+          ${f.tampered ? '<span class="px-2 py-0.5 text-[10px] bg-rose-500/20 text-rose-400 rounded border border-rose-500/30 font-bold">Tampered</span>' : '<i class="fa-solid fa-check text-brand-500 text-xs"></i>'}
+        `;
+        fieldsGrid.appendChild(row);
+      });
+
+      // Render Authenticity Flags
+      const flagsContainer = document.getElementById('authenticityFlags');
+      flagsContainer.innerHTML = '';
+      
+      doc.flags.forEach(flag => {
+        const item = document.createElement('div');
+        item.className = "flex items-start gap-2.5 text-xs p-2 rounded-lg bg-slate-950/60 border border-slate-800/80";
+        item.innerHTML = `
+          <div class="mt-0.5 ${flag.pass ? 'text-brand-500' : 'text-rose-500'}">
+            <i class="fa-solid ${flag.pass ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+          </div>
+          <div>
+            <div class="font-medium ${flag.pass ? 'text-slate-200' : 'text-rose-300'}">${flag.name}</div>
+            <div class="text-[11px] text-slate-400">${flag.desc}</div>
+          </div>
+        `;
+        flagsContainer.appendChild(item);
+      });
+
+      // Render Modal Logs
+      const modalLog = document.getElementById('modalLogContent');
+      modalLog.innerHTML = doc.logs.map(log => `<div class="py-0.5 border-b border-slate-900/80">${log}</div>`).join('');
+    }
+
+    // Interactive Field Highlighting
+    function highlightField(key) {
+      document.querySelectorAll('[id^="field-row-"]').forEach(el => el.classList.remove('ring-2', 'ring-accent-500'));
+      const targetRow = document.getElementById(`field-row-${key}`);
+      if(targetRow) {
+        targetRow.classList.add('ring-2', 'ring-accent-500');
+        targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function highlightBox(key) {
+      highlightField(key);
+    }
+
+    // Handle File Drag / Drop
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          // Custom Upload Mock
+          currentSample = {
+            id: "custom_upload",
+            docType: "CUSTOM_UPLOADED_DOC",
+            verdict: "APPROVED",
+            confidence: 91,
+            verdictText: "VERIFIED",
+            subtext: "User uploaded document processed via AI model.",
+            imageSrc: event.target.result,
+            fields: {
+              extracted_text: { label: "Raw OCR Preview", value: file.name, box: { top: "20%", left: "10%", width: "80%", height: "60%" } }
+            },
+            flags: [
+              { name: "Format & Structure", pass: true, desc: "File format valid and readable" },
+              { name: "AI Extraction Confidence", pass: true, desc: "Text density analysis clear" }
+            ],
+            logs: [
+              `[UPLOAD] File received: ${file.name} (${Math.round(file.size/1024)} KB)`,
+              "[OCR] Extracting document features...",
+              "[VERDICT] Custom document uploaded successfully."
+            ]
+          };
+          runPipelineAnimation();
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Modal Toggle
+    function toggleModal(id) {
+      const modal = document.getElementById(id);
+      modal.classList.toggle('hidden');
+    }
+
+    // Action Handlers
+    function handleApprove() {
+      showToast("Document manually APPROVED and pushed to downstream KYC system.");
+    }
+
+    function handleReject() {
+      showToast("Document REJECTED. Security flag sent to audit queue.", true);
+    }
+
+    function downloadAuditReport() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentSample, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `verification_report_${currentSample.id}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast("JSON Audit Report downloaded successfully!");
+    }
+
+    // Custom Toast Notification
+    function showToast(message, isError = false) {
+      const toast = document.createElement('div');
+      toast.className = `fixed bottom-5 right-5 px-4 py-3 rounded-xl border text-xs font-medium shadow-xl z-50 transition transform duration-300 ${isError ? 'bg-rose-950 border-rose-500/50 text-rose-200' : 'bg-slate-900 border-brand-500/50 text-brand-300'} flex items-center gap-2`;
+      toast.innerHTML = `<i class="fa-solid ${isError ? 'fa-triangle-exclamation text-rose-500' : 'fa-circle-check text-brand-500'}"></i> ${message}`;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    }
+
+    // Initialize on Load
+    window.onload = function() {
+      runPipelineAnimation();
+    };
+  </script>
+</body>
+</html>
